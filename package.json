@@ -1,0 +1,52 @@
+{
+  "name": "react-form-builder",
+  "version": "0.1.0",
+  "description": "Form builder e renderer React independentes, com TypeScript e sem dependências de runtime além do React.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./styles.css": "./dist/styles.css"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-css.mjs",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test tests/model.test.mjs",
+    "prepack": "npm run build"
+  },
+  "keywords": [
+    "react",
+    "form",
+    "form-builder",
+    "typescript",
+    "form-renderer"
+  ],
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.8",
+    "react": "^19.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
