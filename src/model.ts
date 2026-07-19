@@ -60,6 +60,22 @@ export function normalizeOptions(options: readonly FormOption[]): FormOption[] {
     .map((option, index) => ({ ...option, order: index + 1 }));
 }
 
+export function toggleDefaultOption(
+  options: readonly FormOption[],
+  order: number,
+  multiple: boolean,
+): FormOption[] {
+  return options.map((option) => ({
+    ...option,
+    selected:
+      option.order === order
+        ? !(option.selected ?? false)
+        : multiple
+          ? option.selected
+          : false,
+  }));
+}
+
 export function duplicateField(field: FormField, order: number): FormField {
   const duplicate: FormField = {
     ...field,

@@ -1,18 +1,13 @@
 import { useEffect, useId, useMemo, useState } from "react";
-import type { ChangeEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
+import { FieldControl } from "./FieldControl.js";
 import {
-  answerForField,
-  answersForField,
   getDefaultAnswers,
-  maskDigits,
   setFieldAnswer,
   toggleFieldAnswer,
 } from "./model.js";
-import type {
-  FormAnswer,
-  FormField,
-  FormRendererProps,
-} from "./types.js";
+import { SensitiveFieldIndicator } from "./SensitiveFieldIndicator.js";
+import type { FormAnswer, FormField, FormRendererProps } from "./types.js";
 
 function FieldLabel({ field, htmlFor }: { field: FormField; htmlFor?: string }) {
   return (
@@ -33,156 +28,8 @@ function FieldLabel({ field, htmlFor }: { field: FormField; htmlFor?: string }) 
           ?
         </span>
       )}
-      {field.sensitive && (
-        <span
-          className="rfb-sensitive"
-          title="Informação sensível"
-          aria-label="Informação sensível"
-        >
-          ◉
-        </span>
-      )}
+      {field.sensitive && <SensitiveFieldIndicator />}
     </label>
-  );
-}
-
-function FormControl({
-  field,
-  answers,
-  disabled,
-  readOnly,
-  invalid,
-  inputId,
-  onSingleChange,
-  onToggle,
-}: {
-  field: FormField;
-  answers: FormAnswer[];
-  disabled: boolean;
-  readOnly: boolean;
-  invalid: boolean;
-  inputId: string;
-  onSingleChange: (value: string) => void;
-  onToggle: (value: string) => void;
-}) {
-  const answer = answerForField(answers, field);
-  const value = answer?.value ?? "";
-  const className = `rfb-input${invalid ? " rfb-input--invalid" : ""}`;
-  const change = (
-    event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
-  ) => onSingleChange(event.target.value);
-
-  if (field.type === "checkbox-group") {
-    const selected = new Set(
-      answersForField(answers, field).map((item) => item.value),
-    );
-    return (
-      <fieldset className={`rfb-choice-group${invalid ? " rfb-choice-group--invalid" : ""}`}>
-        <legend className="rfb-visually-hidden">{field.label}</legend>
-        {field.formularioCampoOpcao?.map((option) => (
-          <label key={option.id ?? option.order} className="rfb-choice">
-            <input
-              type="checkbox"
-              checked={selected.has(option.value)}
-              disabled={disabled || readOnly}
-              onChange={() => onToggle(option.value)}
-            />
-            <span>{option.value}</span>
-          </label>
-        ))}
-      </fieldset>
-    );
-  }
-
-  if (field.type === "radio-group") {
-    return (
-      <fieldset className={`rfb-choice-group${invalid ? " rfb-choice-group--invalid" : ""}`}>
-        <legend className="rfb-visually-hidden">{field.label}</legend>
-        {field.formularioCampoOpcao?.map((option) => (
-          <label key={option.id ?? option.order} className="rfb-choice">
-            <input
-              type="radio"
-              name={inputId}
-              value={option.value}
-              checked={value === option.value}
-              disabled={disabled || readOnly}
-              onChange={change}
-            />
-            <span>{option.value}</span>
-          </label>
-        ))}
-      </fieldset>
-    );
-  }
-
-  if (field.type === "select") {
-    return (
-      <select
-        id={inputId}
-        className={className}
-        value={value}
-        disabled={disabled || readOnly}
-        required={field.required}
-        onChange={change}
-        aria-invalid={invalid}
-      >
-        <option value="">{field.placeholder ?? "Selecione..."}</option>
-        {field.formularioCampoOpcao?.map((option) => (
-          <option value={option.value} key={option.id ?? option.order}>
-            {option.value}
-          </option>
-        ))}
-      </select>
-    );
-  }
-
-  if (field.type === "textarea") {
-    return (
-      <textarea
-        id={inputId}
-        className={className}
-        value={value}
-        disabled={disabled}
-        readOnly={readOnly}
-        required={field.required}
-        placeholder={field.placeholder}
-        maxLength={field.maxlength}
-        rows={4}
-        onChange={change}
-        aria-invalid={invalid}
-      />
-    );
-  }
-
-  const inputType =
-    field.type === "number" || field.type === "date" ? field.type : "text";
-  return (
-    <input
-      id={inputId}
-      className={className}
-      type={inputType}
-      value={value}
-      disabled={disabled}
-      readOnly={readOnly}
-      required={field.required}
-      placeholder={field.placeholder}
-      maxLength={field.maxlength}
-      min={field.min}
-      max={field.max}
-      inputMode={
-        field.type === "cpf" || field.type === "cnpj" || field.type === "cep"
-          ? "numeric"
-          : undefined
-      }
-      onChange={(event) =>
-        onSingleChange(
-          field.type === "cpf" || field.type === "cnpj" || field.type === "cep"
-            ? maskDigits(event.target.value, field.type)
-            : event.target.value,
-        )
-      }
-      aria-invalid={invalid}
-    />
   );
 }
 
@@ -264,7 +111,7 @@ export function FormRenderer({
             key={field.id ?? `${field.label}-${field.order}`}
           >
             <FieldLabel field={field} htmlFor={inputId} />
-            <FormControl
+            <FieldControl
               field={field}
               answers={answers}
               disabled={disabled}

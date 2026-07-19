@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
+import { FieldControl } from "./FieldControl.js";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -14,8 +15,13 @@ import {
   FIELD_CATALOG,
   createField,
   duplicateField,
+  getDefaultAnswers,
   normalizeFields,
+  setFieldAnswer,
+  toggleDefaultOption,
+  toggleFieldAnswer,
 } from "./model.js";
+import { SensitiveFieldIndicator } from "./SensitiveFieldIndicator.js";
 import { FIELD_TYPES } from "./types.js";
 import type {
   FieldType,
@@ -97,19 +103,7 @@ function OptionEditor({
   };
 
   const selectDefault = (order: number) => {
-    onChange(
-      options.map((option) => ({
-        ...option,
-        selected:
-          option.order === order
-            ? multiple
-              ? !option.selected
-              : true
-            : multiple
-              ? option.selected
-              : false,
-      })),
-    );
+    onChange(toggleDefaultOption(options, order, multiple));
   };
 
   const move = (order: number, direction: -1 | 1) => {
@@ -155,8 +149,17 @@ function OptionEditor({
             name="rfb-default-option"
             checked={option.selected ?? false}
             onChange={() => selectDefault(option.order)}
-            aria-label={`${option.value} como valor padrão`}
-            title="Valor padrão"
+            onClick={() => {
+              if (!multiple && option.selected) selectDefault(option.order);
+            }}
+            aria-label={
+              option.selected
+                ? `Remover ${option.value} como valor padrão`
+                : `Definir ${option.value} como valor padrão`
+            }
+            title={
+              option.selected ? "Remover valor padrão" : "Definir como padrão"
+            }
           />
           <input
             className="rfb-input"
@@ -219,6 +222,12 @@ function FieldEditor({
       ...option,
     })),
   }));
+  const previewFieldId = field.id ?? `rfb-editor-preview-${field.order}`;
+  const [previewAnswers, setPreviewAnswers] = useState(() =>
+    getDefaultAnswers([{ ...field, id: previewFieldId }]),
+  );
+  const previewField = { ...draft, id: previewFieldId };
+  const previewInputId = `rfb-editor-preview-input-${previewFieldId}`;
   const needsOptions =
     draft.type === "select" ||
     draft.type === "radio-group" ||
@@ -237,6 +246,45 @@ function FieldEditor({
           <strong>Editar campo</strong>
           <small>{FIELD_CATALOG[field.type].label}</small>
         </div>
+      </div>
+
+      <div className="rfb-editor__preview">
+        <label
+          className="rfb-editor__preview-label"
+          htmlFor={previewInputId}
+        >
+          {draft.label || "Título do campo"}
+          {draft.required && <span className="rfb-required">*</span>}
+          {draft.description && (
+            <span
+              className="rfb-help"
+              title={draft.description}
+              aria-label={`Ajuda: ${draft.description}`}
+              tabIndex={0}
+            >
+              ?
+            </span>
+          )}
+          {draft.sensitive && <SensitiveFieldIndicator />}
+        </label>
+        <FieldControl
+          field={previewField}
+          answers={previewAnswers}
+          disabled={false}
+          readOnly={false}
+          invalid={false}
+          inputId={previewInputId}
+          onSingleChange={(value) =>
+            setPreviewAnswers((current) =>
+              setFieldAnswer(current, previewField, value),
+            )
+          }
+          onToggle={(value) =>
+            setPreviewAnswers((current) =>
+              toggleFieldAnswer(current, previewField, value),
+            )
+          }
+        />
       </div>
 
       <div className="rfb-grid">
@@ -379,6 +427,70 @@ function FieldEditor({
   );
 }
 
+function FieldEditorModal({
+  field,
+  disabled,
+  onCancel,
+  onSave,
+}: {
+  field: FormField;
+  disabled: boolean;
+  onCancel: () => void;
+  onSave: (field: FormField) => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    if (typeof dialog.showModal === "function") {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute("open", "");
+    }
+
+    return () => {
+      if (typeof dialog.close === "function" && dialog.open) {
+        dialog.close();
+      } else {
+        dialog.removeAttribute("open");
+      }
+    };
+  }, []);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="rfb-modal"
+      aria-label={`Editar ${field.label}`}
+      onCancel={(event) => {
+        event.preventDefault();
+        onCancel();
+      }}
+      onClick={(event) => {
+        if (event.target !== event.currentTarget) return;
+
+        const bounds = event.currentTarget.getBoundingClientRect();
+        const clickedOutside =
+          event.clientX < bounds.left ||
+          event.clientX > bounds.right ||
+          event.clientY < bounds.top ||
+          event.clientY > bounds.bottom;
+
+        if (clickedOutside) onCancel();
+      }}
+    >
+      <FieldEditor
+        field={field}
+        disabled={disabled}
+        onCancel={onCancel}
+        onSave={onSave}
+      />
+    </dialog>
+  );
+}
+
 export function FormBuilder({
   fields: controlledFields,
   defaultFields = [],
@@ -464,12 +576,153 @@ export function FormBuilder({
             <span>{emptyMessage}</span>
           </div>
         ) : (
-          <div className="rfb-field-list">
+          <div
+            className={`rfb-field-list${
+              drag !== null ? " rfb-field-list--dragging" : ""
+            }`}
+          >
             <DropZone active={drag !== null} onDrop={() => dropAt(0)} />
             {fields.map((field, index) => (
               <div key={field.id ?? `${field.type}-${field.order}`}>
-                {editingOrder === field.order ? (
-                  <FieldEditor
+                <article
+                  className="rfb-field-card"
+                  draggable={!disabled && editingOrder === null}
+                  onDragStart={(event) =>
+                    startDrag(event, { kind: "field", order: field.order })
+                  }
+                  onDragEnd={() => setDrag(null)}
+                  onDoubleClick={() =>
+                    !disabled && setEditingOrder(field.order)
+                  }
+                >
+                  <span
+                    className="rfb-drag-handle"
+                    title="Arraste para reordenar"
+                    aria-hidden="true"
+                  >
+                    <GripVerticalIcon />
+                  </span>
+                  <div className="rfb-field-card__content">
+                    <strong>
+                      {field.label}
+                      {field.required && (
+                        <span className="rfb-required" title="Obrigatório">
+                          *
+                        </span>
+                      )}
+                      {field.description && (
+                        <span
+                          className="rfb-help"
+                          title={field.description}
+                          aria-label={`Ajuda: ${field.description}`}
+                          tabIndex={0}
+                        >
+                          ?
+                        </span>
+                      )}
+                      {field.sensitive && <SensitiveFieldIndicator />}
+                    </strong>
+                    <div
+                      className="rfb-field-card__preview"
+                      aria-hidden="true"
+                    >
+                      <FieldControl
+                        field={field}
+                        answers={getDefaultAnswers([field])}
+                        disabled={false}
+                        readOnly
+                        invalid={false}
+                        inputId={`rfb-preview-${field.id ?? field.order}`}
+                        tabIndex={-1}
+                        onSingleChange={() => undefined}
+                        onToggle={() => undefined}
+                      />
+                    </div>
+                  </div>
+                  <div className="rfb-card-actions">
+                    <button
+                      type="button"
+                      className="rfb-icon-button"
+                      onClick={() => {
+                        const currentIndex = field.order - 1;
+                        if (currentIndex <= 0) return;
+                        const next = [...fields];
+                        const previous = next[currentIndex - 1];
+                        if (!previous) return;
+                        next[currentIndex - 1] = field;
+                        next[currentIndex] = previous;
+                        commit(next);
+                      }}
+                      disabled={disabled || field.order === 1}
+                      aria-label={`Mover ${field.label} para cima`}
+                      title="Mover para cima"
+                    >
+                      <ArrowUpIcon />
+                    </button>
+                    <button
+                      type="button"
+                      className="rfb-icon-button"
+                      onClick={() => {
+                        const currentIndex = field.order - 1;
+                        if (currentIndex >= fields.length - 1) return;
+                        const next = [...fields];
+                        const following = next[currentIndex + 1];
+                        if (!following) return;
+                        next[currentIndex] = following;
+                        next[currentIndex + 1] = field;
+                        commit(next);
+                      }}
+                      disabled={disabled || field.order === fields.length}
+                      aria-label={`Mover ${field.label} para baixo`}
+                      title="Mover para baixo"
+                    >
+                      <ArrowDownIcon />
+                    </button>
+                    <button
+                      type="button"
+                      className="rfb-icon-button"
+                      onClick={() => setEditingOrder(field.order)}
+                      disabled={disabled}
+                      aria-label={`Editar ${field.label}`}
+                      title="Editar"
+                    >
+                      <PencilIcon />
+                    </button>
+                    <button
+                      type="button"
+                      className="rfb-icon-button"
+                      onClick={() =>
+                        commit([
+                          ...fields,
+                          duplicateField(field, fields.length + 1),
+                        ])
+                      }
+                      disabled={disabled}
+                      aria-label={`Duplicar ${field.label}`}
+                      title="Duplicar"
+                    >
+                      <CopyIcon />
+                    </button>
+                    <button
+                      type="button"
+                      className="rfb-icon-button rfb-icon-button--danger"
+                      onClick={() =>
+                        commit(
+                          fields.filter(
+                            (item) => item.order !== field.order,
+                          ),
+                        )
+                      }
+                      disabled={disabled}
+                      aria-label={`Excluir ${field.label}`}
+                      title="Excluir"
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
+                </article>
+                {editingOrder === field.order && (
+                  <FieldEditorModal
                     key={`editor-${field.order}`}
                     field={field}
                     disabled={disabled}
@@ -485,124 +738,6 @@ export function FormBuilder({
                       setEditingOrder(null);
                     }}
                   />
-                ) : (
-                  <article
-                    className="rfb-field-card"
-                    draggable={!disabled && editingOrder === null}
-                    onDragStart={(event) =>
-                      startDrag(event, { kind: "field", order: field.order })
-                    }
-                    onDragEnd={() => setDrag(null)}
-                    onDoubleClick={() =>
-                      !disabled && setEditingOrder(field.order)
-                    }
-                  >
-                    <span
-                      className="rfb-drag-handle"
-                      title="Arraste para reordenar"
-                      aria-hidden="true"
-                    >
-                      <GripVerticalIcon />
-                    </span>
-                    <span className="rfb-type-icon">
-                      <FieldTypeIcon type={field.type} />
-                    </span>
-                    <div className="rfb-field-card__content">
-                      <strong>
-                        {field.label}
-                        {field.required && (
-                          <span className="rfb-required" title="Obrigatório">
-                            *
-                          </span>
-                        )}
-                      </strong>
-                      <small>
-                        {FIELD_CATALOG[field.type].label}
-                        {field.sensitive ? " · sensível" : ""}
-                      </small>
-                    </div>
-                    <div className="rfb-card-actions">
-                      <button
-                        type="button"
-                        className="rfb-icon-button"
-                        onClick={() => {
-                          const currentIndex = field.order - 1;
-                          if (currentIndex <= 0) return;
-                          const next = [...fields];
-                          const previous = next[currentIndex - 1];
-                          if (!previous) return;
-                          next[currentIndex - 1] = field;
-                          next[currentIndex] = previous;
-                          commit(next);
-                        }}
-                        disabled={disabled || field.order === 1}
-                        aria-label={`Mover ${field.label} para cima`}
-                        title="Mover para cima"
-                      >
-                        <ArrowUpIcon />
-                      </button>
-                      <button
-                        type="button"
-                        className="rfb-icon-button"
-                        onClick={() => {
-                          const currentIndex = field.order - 1;
-                          if (currentIndex >= fields.length - 1) return;
-                          const next = [...fields];
-                          const following = next[currentIndex + 1];
-                          if (!following) return;
-                          next[currentIndex] = following;
-                          next[currentIndex + 1] = field;
-                          commit(next);
-                        }}
-                        disabled={disabled || field.order === fields.length}
-                        aria-label={`Mover ${field.label} para baixo`}
-                        title="Mover para baixo"
-                      >
-                        <ArrowDownIcon />
-                      </button>
-                      <button
-                        type="button"
-                        className="rfb-icon-button"
-                        onClick={() => setEditingOrder(field.order)}
-                        disabled={disabled}
-                        aria-label={`Editar ${field.label}`}
-                        title="Editar"
-                      >
-                        <PencilIcon />
-                      </button>
-                      <button
-                        type="button"
-                        className="rfb-icon-button"
-                        onClick={() =>
-                          commit([
-                            ...fields,
-                            duplicateField(field, fields.length + 1),
-                          ])
-                        }
-                        disabled={disabled}
-                        aria-label={`Duplicar ${field.label}`}
-                        title="Duplicar"
-                      >
-                        <CopyIcon />
-                      </button>
-                      <button
-                        type="button"
-                        className="rfb-icon-button rfb-icon-button--danger"
-                        onClick={() =>
-                          commit(
-                            fields.filter(
-                              (item) => item.order !== field.order,
-                            ),
-                          )
-                        }
-                        disabled={disabled}
-                        aria-label={`Excluir ${field.label}`}
-                        title="Excluir"
-                      >
-                        <TrashIcon />
-                      </button>
-                    </div>
-                  </article>
                 )}
                 <DropZone
                   active={drag !== null}

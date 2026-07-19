@@ -6,6 +6,7 @@ import {
   maskDigits,
   normalizeFields,
   setFieldAnswer,
+  toggleDefaultOption,
   toggleFieldAnswer,
   validate,
   validateForm,
@@ -38,6 +39,26 @@ test("cria respostas padrão sem duplicar respostas existentes", () => {
   assert.equal(first.length, 1);
   assert.equal(first[0].value, "Opção 2");
   assert.deepEqual(second, first);
+});
+
+test("permite remover a opção padrão em campos de seleção única", () => {
+  const options = [
+    { order: 1, value: "Opção 1", selected: false },
+    { order: 2, value: "Opção 2", selected: true },
+    { order: 3, value: "Opção 3", selected: false },
+  ];
+
+  const withoutDefault = toggleDefaultOption(options, 2, false);
+  const withNewDefault = toggleDefaultOption(withoutDefault, 3, false);
+
+  assert.deepEqual(
+    withoutDefault.map((option) => option.selected),
+    [false, false, false],
+  );
+  assert.deepEqual(
+    withNewDefault.map((option) => option.selected),
+    [false, false, true],
+  );
 });
 
 test("substitui respostas simples e alterna respostas múltiplas", () => {
