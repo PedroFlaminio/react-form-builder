@@ -107,3 +107,13 @@ export interface FormRendererProps {
   noValidate?: boolean;
   "aria-label"?: string;
 }
+
+export interface FormAnswersProps {
+  /** Respostas produzidas pelo `FormRenderer`. */
+  answers: readonly FormAnswer[];
+  /** Conteúdo exibido quando não há respostas. */
+  emptyMessage?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  "aria-label"?: string;
+}

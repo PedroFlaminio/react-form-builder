@@ -5,6 +5,7 @@ TypeScript e sem dependências de interface externas.
 
 - Construtor visual com adição, edição, cópia, remoção e reordenação de campos.
 - Renderizador com respostas controladas ou não controladas.
+- Visualizador das respostas enviadas, com agrupamento de escolhas múltiplas.
 - Validação de campos obrigatórios e máscaras de CPF, CNPJ e CEP.
 - Suporte a campos sensíveis e formulários anônimos.
 - Tipos TypeScript e helpers exportados pela API pública.
@@ -114,6 +115,29 @@ export function FormularioDeContato({ fields }: ContactFormProps) {
 Para uso não controlado, substitua `value` por `defaultValue`. O callback
 `onChange` continua disponível para observar cada alteração.
 
+### Exibir as respostas enviadas
+
+O `FormAnswers` recebe diretamente o array produzido pelo `FormRenderer`:
+
+```tsx
+import { FormAnswers, type FormAnswer } from "react-form-builder";
+
+export function RespostasEnviadas({ answers }: { answers: FormAnswer[] }) {
+  return (
+    <FormAnswers
+      answers={answers}
+      emptyMessage="Nenhuma resposta foi enviada."
+    />
+  );
+}
+```
+
+Respostas de campos de seleção múltipla são agrupadas pelo `fieldId` ou, quando
+ele não existe, pelo rótulo do campo. A ordem definida nas respostas é
+preservada, datas são apresentadas no formato `DD/MM/YYYY` e valores vazios
+aparecem como “Não informado”. Campos marcados como sensíveis permanecem
+visíveis, mas seus valores são substituídos por “Resposta ocultada”.
+
 ## Tipos de campo
 
 | Tipo | Descrição |
@@ -218,6 +242,16 @@ campos geram uma única resposta.
 | `style` | `CSSProperties` | Estilos inline do formulário |
 | `aria-label` | `string` | Nome acessível do formulário |
 
+### `FormAnswers`
+
+| Propriedade | Tipo | Descrição |
+| --- | --- | --- |
+| `answers` | `readonly FormAnswer[]` | Respostas produzidas pelo renderizador |
+| `emptyMessage` | `ReactNode` | Conteúdo exibido quando não há respostas |
+| `className` | `string` | Classe adicional no elemento raiz |
+| `style` | `CSSProperties` | Estilos inline do elemento raiz |
+| `aria-label` | `string` | Nome acessível da seção de respostas |
+
 `FormRender`, `formErrors` e `anonimo` são aliases mantidos para facilitar a
 migração de integrações existentes.
 
@@ -251,6 +285,7 @@ Componentes:
 
 - `FormBuilder`
 - `FormRenderer`
+- `FormAnswers`
 - `FormRender` — alias de `FormRenderer`
 
 Constantes:
@@ -292,6 +327,7 @@ Tipos principais:
 - `FormDefinition` / `Formulario`
 - `FormBuilderProps`
 - `FormRendererProps`
+- `FormAnswersProps`
 
 ## Personalização visual
 

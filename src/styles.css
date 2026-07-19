@@ -757,6 +757,98 @@ textarea.rfb-input:read-only {
   color: var(--rfb-danger);
 }
 
+.rfb-answers {
+  width: 100%;
+}
+
+.rfb-answers__list {
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid var(--rfb-border);
+  border-radius: var(--rfb-radius);
+  background: var(--rfb-surface);
+}
+
+.rfb-answers__item {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.7fr) minmax(0, 1.3fr);
+  gap: 24px;
+  padding: 17px 19px;
+}
+
+.rfb-answers__item + .rfb-answers__item {
+  border-top: 1px solid var(--rfb-border);
+}
+
+.rfb-answers__label {
+  min-width: 0;
+  color: var(--rfb-muted);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.rfb-answers__label .rfb-sensitive {
+  width: 18px;
+  height: 18px;
+  vertical-align: -5px;
+}
+
+.rfb-answers__label .rfb-sensitive .rfb-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.rfb-answers__value {
+  min-width: 0;
+  margin: 0;
+  color: var(--rfb-text);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.rfb-answers__hidden {
+  color: var(--rfb-muted);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.rfb-answers__values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rfb-answers__values li {
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--rfb-primary-soft);
+  color: var(--rfb-primary);
+  font-size: 13px;
+}
+
+.rfb-answers__unanswered {
+  color: var(--rfb-muted);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.rfb-answers__empty {
+  display: grid;
+  min-height: 180px;
+  padding: 28px;
+  place-items: center;
+  border: 1px dashed var(--rfb-border-strong);
+  border-radius: var(--rfb-radius);
+  color: var(--rfb-muted);
+  text-align: center;
+}
+
 .rfb-visually-hidden {
   position: absolute !important;
   overflow: hidden;
@@ -798,6 +890,11 @@ textarea.rfb-input:read-only {
 
   .rfb-control--wide {
     grid-column: auto;
+  }
+
+  .rfb-answers__item {
+    grid-template-columns: 1fr;
+    gap: 7px;
   }
 }
 

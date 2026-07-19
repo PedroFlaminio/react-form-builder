@@ -2,6 +2,7 @@ import "./styles.css";
 
 export { FormBuilder } from "./FormBuilder.js";
 export { FormRenderer, FormRenderer as FormRender } from "./FormRenderer.js";
+export { FormAnswers } from "./FormAnswers.js";
 export {
   FIELD_CATALOG,
   answerForField,
@@ -25,6 +26,7 @@ export type {
   Answer,
   FieldType,
   FormAnswer,
+  FormAnswersProps,
   FormBuilderProps,
   FormDefinition,
   FormError,

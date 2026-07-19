@@ -1,7 +1,7 @@
 {
   "name": "react-form-builder",
   "version": "0.1.0",
-  "description": "Form builder e renderer React independentes, com TypeScript e sem dependências de runtime além do React.",
+  "description": "Form builder, renderer e visualizador de respostas React, com TypeScript e sem dependências de runtime além do React.",
   "license": "MIT",
   "type": "module",
   "sideEffects": [
