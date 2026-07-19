@@ -1,12 +1,17 @@
 import { FIELD_TYPES } from "./types.js";
 import type { FieldType, FormAnswer, FormError, FormField, FormOption } from "./types.js";
 
+export const DEFAULT_CURRENCY_PREFIX = "R$";
+export const DEFAULT_PHONE_PREFIX = "+55";
+
 export const FIELD_CATALOG: Record<
   FieldType,
   { label: string; icon: string; placeholder?: string }
 > = {
   text: { label: "Campo de texto", icon: "T", placeholder: "Insira um texto..." },
   number: { label: "Número", icon: "#", placeholder: "Insira um número..." },
+  currency: { label: "Valor monetário", icon: "R$", placeholder: "0,00" },
+  phone: { label: "Telefone", icon: "☎", placeholder: "00 00000-0000" },
   date: { label: "Data", icon: "◫" },
   cpf: { label: "CPF", icon: "ID", placeholder: "000.000.000-00" },
   cnpj: { label: "CNPJ", icon: "PJ", placeholder: "00.000.000/0000-00" },
@@ -23,7 +28,14 @@ export function isFieldType(value: unknown): value is FieldType {
   return typeof value === "string" && (FIELD_TYPES as readonly string[]).includes(value);
 }
 
-export function createField(type: FieldType, order: number): FormField {
+export function createField(
+  type: FieldType,
+  order: number,
+  prefixes: {
+    currencyPrefix?: string;
+    phonePrefix?: string;
+  } = {},
+): FormField {
   const catalog = FIELD_CATALOG[type];
   const field: FormField = {
     type,
@@ -31,6 +43,12 @@ export function createField(type: FieldType, order: number): FormField {
     label: catalog.label,
   };
   if (catalog.placeholder !== undefined) field.placeholder = catalog.placeholder;
+  if (type === "currency") {
+    field.prefix = prefixes.currencyPrefix ?? DEFAULT_CURRENCY_PREFIX;
+  }
+  if (type === "phone") {
+    field.prefix = prefixes.phonePrefix ?? DEFAULT_PHONE_PREFIX;
+  }
   if (optionTypes.has(type)) {
     const count = type === "checkbox-group" ? 1 : 3;
     field.formularioCampoOpcao = Array.from({ length: count }, (_, index) => ({
@@ -122,6 +140,7 @@ export function createAnswer(field: FormField, value: string): FormAnswer {
     sensitive: field.sensitive ?? false,
   };
   if (field.id !== undefined) answer.fieldId = field.id;
+  if (field.prefix !== undefined) answer.prefix = field.prefix;
   return answer;
 }
 
@@ -216,4 +235,39 @@ export function maskDigits(value: string, type: "cpf" | "cnpj" | "cep"): string 
     .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
     .replace(/\.(\d{3})(\d)/, ".$1/$2")
     .replace(/(\d{4})(\d)/, "$1-$2");
+}
+
+export function maskCurrency(value: string): string {
+  const digits = value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+  if (digits === "") return "";
+
+  const padded = digits.padStart(3, "0");
+  const integer = padded
+    .slice(0, -2)
+    .replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+  return `${integer},${padded.slice(-2)}`;
+}
+
+export function maskPhone(
+  value: string,
+  prefix = DEFAULT_PHONE_PREFIX,
+): string {
+  const trimmedValue = value.trimStart();
+  const trimmedPrefix = prefix.trim();
+  const localValue =
+    trimmedPrefix !== "" && trimmedValue.startsWith(trimmedPrefix)
+      ? trimmedValue.slice(trimmedPrefix.length)
+      : trimmedValue;
+  const digits = localValue.replace(/\D/g, "").slice(0, 11);
+
+  if (digits.length <= 2) return digits;
+
+  const areaCode = digits.slice(0, 2);
+  const number = digits.slice(2);
+  const prefixLength = digits.length === 11 ? 5 : 4;
+
+  if (number.length <= prefixLength) return `${areaCode} ${number}`;
+
+  return `${areaCode} ${number.slice(0, prefixLength)}-${number.slice(prefixLength)}`;
 }

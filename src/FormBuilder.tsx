@@ -12,6 +12,8 @@ import {
   TrashIcon,
 } from "./icons.js";
 import {
+  DEFAULT_CURRENCY_PREFIX,
+  DEFAULT_PHONE_PREFIX,
   FIELD_CATALOG,
   createField,
   duplicateField,
@@ -311,6 +313,22 @@ function FieldEditor({
             </label>
           )}
 
+        {(draft.type === "currency" || draft.type === "phone") && (
+          <label className="rfb-control">
+            <span>Prefixo</span>
+            <input
+              className="rfb-input"
+              value={
+                draft.prefix ??
+                (draft.type === "currency"
+                  ? DEFAULT_CURRENCY_PREFIX
+                  : DEFAULT_PHONE_PREFIX)
+              }
+              onChange={(event) => patch({ prefix: event.target.value })}
+            />
+          </label>
+        )}
+
         <label className="rfb-control">
           <span>Texto de ajuda</span>
           <input
@@ -496,6 +514,8 @@ export function FormBuilder({
   defaultFields = [],
   onChange,
   allowedTypes = FIELD_TYPES,
+  currencyPrefix = DEFAULT_CURRENCY_PREFIX,
+  phonePrefix = DEFAULT_PHONE_PREFIX,
   disabled = false,
   className = "",
   style,
@@ -521,7 +541,11 @@ export function FormBuilder({
   const add = (type: FieldType, position = fields.length) => {
     if (disabled) return;
     const next = [...fields];
-    next.splice(position, 0, createField(type, position + 1));
+    next.splice(
+      position,
+      0,
+      createField(type, position + 1, { currencyPrefix, phonePrefix }),
+    );
     commit(next);
   };
 

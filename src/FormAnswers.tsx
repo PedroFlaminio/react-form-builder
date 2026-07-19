@@ -1,4 +1,8 @@
 import { SensitiveFieldIndicator } from "./SensitiveFieldIndicator.js";
+import {
+  DEFAULT_CURRENCY_PREFIX,
+  DEFAULT_PHONE_PREFIX,
+} from "./model.js";
 import type { FormAnswer, FormAnswersProps } from "./types.js";
 
 interface AnswerGroup {
@@ -7,11 +11,22 @@ interface AnswerGroup {
   order?: number;
   sensitive: boolean;
   type: FormAnswer["type"];
+  prefix?: string;
   values: string[];
   index: number;
 }
 
-function formatAnswerValue(value: string, type: FormAnswer["type"]): string {
+function formatAnswerValue(
+  value: string,
+  type: FormAnswer["type"],
+  prefix?: string,
+): string {
+  if (type === "currency") {
+    return `${prefix ?? DEFAULT_CURRENCY_PREFIX} ${value}`.trim();
+  }
+  if (type === "phone") {
+    return `${prefix ?? DEFAULT_PHONE_PREFIX} ${value}`.trim();
+  }
   if (type !== "date") return value;
 
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -48,6 +63,7 @@ function groupAnswers(answers: readonly FormAnswer[]): AnswerGroup[] {
       values: [answer.value],
       index,
     };
+    if (answer.prefix !== undefined) group.prefix = answer.prefix;
     if (answer.order !== undefined) group.order = answer.order;
     groups.set(key, group);
   });
@@ -90,7 +106,11 @@ export function FormAnswers({
                 ) : group.values.length === 1 ? (
                   <span className={group.values[0]?.trim() ? "" : "rfb-answers__unanswered"}>
                     {group.values[0]?.trim()
-                      ? formatAnswerValue(group.values[0], group.type)
+                      ? formatAnswerValue(
+                          group.values[0],
+                          group.type,
+                          group.prefix,
+                        )
                       : "Não informado"}
                   </span>
                 ) : (
@@ -100,7 +120,9 @@ export function FormAnswers({
                         className={value.trim() ? "" : "rfb-answers__unanswered"}
                         key={`${value}-${index}`}
                       >
-                        {value.trim() ? formatAnswerValue(value, group.type) : "Não informado"}
+                        {value.trim()
+                          ? formatAnswerValue(value, group.type, group.prefix)
+                          : "Não informado"}
                       </li>
                     ))}
                   </ul>

@@ -3,6 +3,8 @@ import type { CSSProperties, FormEvent, ReactNode } from "react";
 export const FIELD_TYPES = [
   "text",
   "number",
+  "currency",
+  "phone",
   "date",
   "cpf",
   "cnpj",
@@ -34,6 +36,7 @@ export interface FormField {
   label: string;
   description?: string | undefined;
   placeholder?: string | undefined;
+  prefix?: string | undefined;
   max?: number | undefined;
   min?: number | undefined;
   maxlength?: number | undefined;
@@ -50,6 +53,7 @@ export interface FormAnswer {
   label: string;
   value: string;
   type?: FieldType | string | undefined;
+  prefix?: string | undefined;
   sensitive?: boolean | undefined;
 }
 
@@ -77,6 +81,10 @@ export interface FormBuilderProps {
   defaultFields?: FormField[];
   onChange?: (fields: FormField[]) => void;
   allowedTypes?: readonly FieldType[];
+  /** Prefixo inicial dos novos campos monetários. */
+  currencyPrefix?: string;
+  /** Prefixo inicial dos novos campos de telefone. */
+  phonePrefix?: string;
   disabled?: boolean;
   className?: string;
   style?: CSSProperties;

@@ -117,6 +117,24 @@ function NumberFieldIcon() {
   );
 }
 
+function CurrencyFieldIcon() {
+  return (
+    <Icon>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M16 8.5c-.8-.7-2-1-3.4-1-1.8 0-3.1.8-3.1 2s1.1 1.8 3.2 2.3 3.3.9 3.3 2.4-1.4 2.3-3.3 2.3c-1.5 0-2.9-.5-3.7-1.3" />
+      <path d="M12.5 5.5v13" />
+    </Icon>
+  );
+}
+
+function PhoneFieldIcon() {
+  return (
+    <Icon>
+      <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.8a2 2 0 0 1-.4 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z" />
+    </Icon>
+  );
+}
+
 function DateFieldIcon() {
   return (
     <Icon>
@@ -211,6 +229,10 @@ export function FieldTypeIcon({ type }: { type: FieldType }) {
       return <TextFieldIcon />;
     case "number":
       return <NumberFieldIcon />;
+    case "currency":
+      return <CurrencyFieldIcon />;
+    case "phone":
+      return <PhoneFieldIcon />;
     case "date":
       return <DateFieldIcon />;
     case "cpf":

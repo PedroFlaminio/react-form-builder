@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  createAnswer,
   createField,
   getDefaultAnswers,
+  maskCurrency,
   maskDigits,
+  maskPhone,
   normalizeFields,
   setFieldAnswer,
   toggleDefaultOption,
@@ -96,4 +99,28 @@ test("aplica máscaras de CPF, CNPJ e CEP sem dependências", () => {
   assert.equal(maskDigits("12345678901", "cpf"), "123.456.789-01");
   assert.equal(maskDigits("12345678000199", "cnpj"), "12.345.678/0001-99");
   assert.equal(maskDigits("12345678", "cep"), "12345-678");
+});
+
+test("aplica máscara de valor monetário", () => {
+  assert.equal(maskCurrency("1"), "0,01");
+  assert.equal(maskCurrency("1234"), "12,34");
+  assert.equal(maskCurrency("R$ 1.234,56"), "1.234,56");
+  assert.equal(maskCurrency(""), "");
+});
+
+test("aplica máscaras de telefone com dez ou onze dígitos", () => {
+  assert.equal(maskPhone("1133334444"), "11 3333-4444");
+  assert.equal(maskPhone("11999998888"), "11 99999-8888");
+  assert.equal(maskPhone("+55 11 99999-8888"), "11 99999-8888");
+  assert.equal(maskPhone("+351 11 99999-8888", "+351"), "11 99999-8888");
+  assert.equal(maskPhone("1199999888899"), "11 99999-8888");
+});
+
+test("define e preserva prefixos personalizados", () => {
+  const currency = createField("currency", 1, { currencyPrefix: "US$" });
+  const phone = createField("phone", 2, { phonePrefix: "+351" });
+
+  assert.equal(currency.prefix, "US$");
+  assert.equal(phone.prefix, "+351");
+  assert.equal(createAnswer(currency, "10,00").prefix, "US$");
 });

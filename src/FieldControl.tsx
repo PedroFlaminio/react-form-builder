@@ -1,6 +1,14 @@
 import type { ChangeEvent } from "react";
 import { ArrowDownIcon } from "./icons.js";
-import { answerForField, answersForField, maskDigits } from "./model.js";
+import {
+  DEFAULT_CURRENCY_PREFIX,
+  DEFAULT_PHONE_PREFIX,
+  answerForField,
+  answersForField,
+  maskCurrency,
+  maskDigits,
+  maskPhone,
+} from "./model.js";
 import type { FormAnswer, FormField } from "./types.js";
 
 export function FieldControl({
@@ -129,6 +137,67 @@ export function FieldControl({
         onChange={change}
         aria-invalid={invalid}
       />
+    );
+  }
+
+  if (field.type === "currency" || field.type === "phone") {
+    const isCurrency = field.type === "currency";
+    const prefix =
+      field.prefix ??
+      (isCurrency ? DEFAULT_CURRENCY_PREFIX : DEFAULT_PHONE_PREFIX);
+    const affixedClassName = [
+      "rfb-affixed-input",
+      invalid ? "rfb-affixed-input--invalid" : "",
+      disabled || readOnly ? "rfb-affixed-input--disabled" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    return (
+      <span className={affixedClassName}>
+        {prefix !== "" && (
+          <span className="rfb-affixed-input__prefix" aria-hidden="true">
+            {prefix}
+          </span>
+        )}
+        <input
+          id={inputId}
+          className="rfb-input rfb-affixed-input__control"
+          type={isCurrency ? "text" : "tel"}
+          value={value}
+          disabled={disabled}
+          readOnly={readOnly}
+          required={field.required}
+          placeholder={field.placeholder}
+          tabIndex={tabIndex}
+          inputMode="numeric"
+          onChange={(event) =>
+            onSingleChange(
+              isCurrency
+                ? maskCurrency(event.target.value)
+                : maskPhone(event.target.value, prefix),
+            )
+          }
+          onKeyDown={(event) => {
+            if (
+              !isCurrency ||
+              event.key !== "Backspace" ||
+              event.currentTarget.selectionStart !== value.length ||
+              event.currentTarget.selectionEnd !== value.length
+            ) {
+              return;
+            }
+
+            event.preventDefault();
+            const digits = value
+              .replace(/\D/g, "")
+              .replace(/^0+/, "")
+              .slice(0, -1);
+            onSingleChange(maskCurrency(digits));
+          }}
+          aria-invalid={invalid}
+        />
+      </span>
     );
   }
 

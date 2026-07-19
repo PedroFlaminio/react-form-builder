@@ -144,6 +144,8 @@ visíveis, mas seus valores são substituídos por “Resposta ocultada”.
 | --- | --- |
 | `text` | Texto em uma linha |
 | `number` | Número com limites mínimo e máximo opcionais |
+| `currency` | Valor monetário com prefixo `R$` e máscara brasileira |
+| `phone` | Telefone com prefixo `+55` e máscara de 10 ou 11 dígitos |
 | `date` | Data |
 | `cpf` | CPF com máscara |
 | `cnpj` | CNPJ com máscara |
@@ -162,6 +164,8 @@ type FormField = {
   type:
     | "text"
     | "number"
+    | "currency"
+    | "phone"
     | "date"
     | "cpf"
     | "cnpj"
@@ -175,6 +179,7 @@ type FormField = {
   sensitive?: boolean;
   description?: string;
   placeholder?: string;
+  prefix?: string;
   min?: number;
   max?: number;
   maxlength?: number;
@@ -199,6 +204,7 @@ type FormAnswer = {
   label: string;
   value: string;
   type?: FieldType | string;
+  prefix?: string;
   sensitive?: boolean;
 };
 ```
@@ -216,6 +222,8 @@ campos geram uma única resposta.
 | `defaultFields` | `FormField[]` | Campos iniciais no modo não controlado |
 | `onChange` | `(fields) => void` | Executado após cada alteração |
 | `allowedTypes` | `readonly FieldType[]` | Restringe os tipos exibidos na paleta |
+| `currencyPrefix` | `string` | Prefixo inicial de novos campos monetários; padrão `R$` |
+| `phonePrefix` | `string` | Prefixo inicial de novos campos de telefone; padrão `+55` |
 | `disabled` | `boolean` | Bloqueia alterações |
 | `emptyMessage` | `ReactNode` | Mensagem exibida quando não há campos |
 | `className` | `string` | Classe adicional no elemento raiz |
