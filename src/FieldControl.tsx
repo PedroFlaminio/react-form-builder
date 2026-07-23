@@ -213,6 +213,7 @@ export function FieldControl({
       readOnly={readOnly}
       required={field.required}
       placeholder={field.placeholder}
+      minLength={field.type === "text" ? field.minlength : undefined}
       maxLength={field.maxlength}
       min={field.min}
       max={field.max}

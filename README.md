@@ -182,7 +182,9 @@ type FormField = {
   prefix?: string;
   min?: number;
   max?: number;
+  minlength?: number;
   maxlength?: number;
+  defaultValue?: string;
   formularioCampoOpcao?: FormOption[];
 };
 
@@ -265,7 +267,8 @@ migração de integrações existentes.
 
 ## Validação
 
-`validateForm` verifica os campos obrigatórios e sempre retorna um array:
+`validateForm` verifica os campos obrigatórios e o tamanho mínimo configurado
+nos campos de texto, e sempre retorna um array:
 
 ```ts
 const errors = validateForm(answers, fields, anonymous);

@@ -44,6 +44,26 @@ test("cria respostas padrão sem duplicar respostas existentes", () => {
   assert.deepEqual(second, first);
 });
 
+test("cria a resposta padrão de um campo de texto", () => {
+  const field = {
+    id: "cidade",
+    order: 1,
+    type: "text",
+    label: "Cidade",
+    defaultValue: "São Paulo",
+  };
+
+  const defaults = getDefaultAnswers([field]);
+  const withPreviousAnswer = getDefaultAnswers(
+    [field],
+    [createAnswer(field, "Campinas")],
+  );
+
+  assert.equal(defaults.length, 1);
+  assert.equal(defaults[0].value, "São Paulo");
+  assert.equal(withPreviousAnswer[0].value, "Campinas");
+});
+
 test("permite remover a opção padrão em campos de seleção única", () => {
   const options = [
     { order: 1, value: "Opção 1", selected: false },
@@ -93,6 +113,25 @@ test("valida obrigatórios e mantém o retorno legado", () => {
   assert.equal(validateForm([], [field]).length, 1);
   assert.equal(validate([], [field])?.[0].field, "Nome");
   assert.equal(validate([{ label: "Nome", value: "Ana" }], [field]), undefined);
+});
+
+test("valida o tamanho mínimo de campos de texto preenchidos", () => {
+  const field = {
+    order: 1,
+    type: "text",
+    label: "Apelido",
+    minlength: 4,
+  };
+
+  assert.equal(validateForm([], [field]).length, 0);
+  assert.match(
+    validateForm([{ label: "Apelido", value: "Ana" }], [field])[0].error,
+    /no mínimo 4 caracteres/,
+  );
+  assert.equal(
+    validateForm([{ label: "Apelido", value: "Analu" }], [field]).length,
+    0,
+  );
 });
 
 test("aplica máscaras de CPF, CNPJ e CEP sem dependências", () => {

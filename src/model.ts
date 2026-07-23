@@ -178,6 +178,14 @@ export function getDefaultAnswers(
   let answers = [...previous];
   for (const field of normalizeFields(fields)) {
     if (answers.some((answer) => sameField(answer, field))) continue;
+    if (
+      field.type === "text" &&
+      field.defaultValue !== undefined &&
+      field.defaultValue !== ""
+    ) {
+      answers = [...answers, createAnswer(field, field.defaultValue)];
+      continue;
+    }
     const selected = field.formularioCampoOpcao?.filter((option) => option.selected) ?? [];
     for (const option of selected) {
       answers = [...answers, createAnswer(field, option.value)];
@@ -203,6 +211,19 @@ export function validateForm(
         field: field.label,
         error: `${field.label}: Campo obrigatório.`,
       });
+    }
+    if (
+      field.type === "text" &&
+      field.minlength !== undefined &&
+      field.minlength > 0
+    ) {
+      const value = values.find((answer) => answer.value.trim() !== "")?.value;
+      if (value !== undefined && value.length < field.minlength) {
+        errors.push({
+          field: field.label,
+          error: `${field.label}: Deve ter no mínimo ${field.minlength} caracteres.`,
+        });
+      }
     }
   }
   return errors;

@@ -39,7 +39,9 @@ export interface FormField {
   prefix?: string | undefined;
   max?: number | undefined;
   min?: number | undefined;
+  minlength?: number | undefined;
   maxlength?: number | undefined;
+  defaultValue?: string | undefined;
   formularioCampoOpcao?: FormOption[] | undefined;
 }
 

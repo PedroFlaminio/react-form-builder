@@ -423,6 +423,27 @@ function FieldEditor({
           />
         </label>
 
+        {draft.type === "text" && (
+          <label className="rfb-control">
+            <span>Tamanho mínimo</span>
+            <input
+              className="rfb-input"
+              type="number"
+              min="1"
+              step="1"
+              value={draft.minlength ?? ""}
+              onChange={(event) =>
+                patch({
+                  minlength:
+                    event.target.value === ""
+                      ? undefined
+                      : Number(event.target.value),
+                })
+              }
+            />
+          </label>
+        )}
+
         {(draft.type === "text" || draft.type === "textarea") && (
           <label className="rfb-control">
             <span>Tamanho máximo</span>
@@ -439,6 +460,26 @@ function FieldEditor({
                       : Number(event.target.value),
                 })
               }
+            />
+          </label>
+        )}
+
+        {draft.type === "text" && (
+          <label className="rfb-control">
+            <span>Valor padrão</span>
+            <input
+              className="rfb-input"
+              value={draft.defaultValue ?? ""}
+              onChange={(event) => {
+                const defaultValue = event.target.value;
+                patch({
+                  defaultValue:
+                    defaultValue === "" ? undefined : defaultValue,
+                });
+                setPreviewAnswers((current) =>
+                  setFieldAnswer(current, previewField, defaultValue),
+                );
+              }}
             />
           </label>
         )}
