@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import { FieldControl } from "./FieldControl.js";
 import {
@@ -18,6 +18,7 @@ import {
   createField,
   duplicateField,
   getDefaultAnswers,
+  isFieldType,
   normalizeFields,
   setFieldAnswer,
   toggleDefaultOption,
@@ -37,6 +38,89 @@ type FieldDrag =
   | { kind: "field"; order: number }
   | null;
 
+const FIELD_DRAG_DATA_TYPE = "application/x-react-form-builder-field";
+
+function parseFieldDrag(dataTransfer: DataTransfer): FieldDrag {
+  const serialized =
+    dataTransfer.getData(FIELD_DRAG_DATA_TYPE) ||
+    dataTransfer.getData("text/plain");
+  if (!serialized) return null;
+
+  try {
+    const value: unknown = JSON.parse(serialized);
+    if (!value || typeof value !== "object" || !("kind" in value)) return null;
+
+    if (
+      value.kind === "new" &&
+      "type" in value &&
+      isFieldType(value.type)
+    ) {
+      return { kind: "new", type: value.type };
+    }
+    if (
+      value.kind === "field" &&
+      "order" in value &&
+      typeof value.order === "number" &&
+      Number.isInteger(value.order)
+    ) {
+      return { kind: "field", order: value.order };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+interface PendingFieldMove {
+  fromOrder: number;
+  toOrder: number;
+  fromTop: number;
+  toTop: number;
+  fieldId: FormField["id"];
+  fieldType: FieldType;
+  fieldLabel: string;
+}
+
+interface HighlightedField {
+  order: number;
+  id: FormField["id"];
+  type: FieldType;
+  label: string;
+}
+
+type PendingFieldScroll = HighlightedField;
+
+const useIsomorphicLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+function highlightedFieldFrom(
+  field: FormField,
+  order = field.order,
+): HighlightedField {
+  return {
+    order,
+    id: field.id,
+    type: field.type,
+    label: field.label,
+  };
+}
+
+function isHighlightedField(
+  field: FormField,
+  highlightedField: HighlightedField | null,
+): boolean {
+  if (!highlightedField) return false;
+  if (highlightedField.id !== undefined) {
+    return field.id === highlightedField.id;
+  }
+  return (
+    field.order === highlightedField.order &&
+    field.type === highlightedField.type &&
+    field.label === highlightedField.label
+  );
+}
+
 function reindexFields(fields: readonly FormField[]): FormField[] {
   return fields.map((field, index) => ({ ...field, order: index + 1 }));
 }
@@ -50,7 +134,7 @@ function DropZone({
   onDrop,
 }: {
   active: boolean;
-  onDrop: () => void;
+  onDrop: (event: DragEvent<HTMLDivElement>) => void;
 }) {
   const [isOver, setIsOver] = useState(false);
 
@@ -75,8 +159,9 @@ function DropZone({
       onDragLeave={() => setIsOver(false)}
       onDrop={(event) => {
         event.preventDefault();
+        event.stopPropagation();
         setIsOver(false);
-        onDrop();
+        onDrop(event);
       }}
       aria-hidden="true"
     >
@@ -527,9 +612,113 @@ export function FormBuilder({
   );
   const [editingOrder, setEditingOrder] = useState<number | null>(null);
   const [drag, setDrag] = useState<FieldDrag>(null);
+  const dragRef = useRef<FieldDrag>(null);
+  const [highlightedField, setHighlightedField] =
+    useState<HighlightedField | null>(null);
+  const fieldCardsRef = useRef(new Map<number, HTMLElement>());
+  const pendingFieldMoveRef = useRef<PendingFieldMove | null>(null);
+  const pendingFieldScrollRef = useRef<PendingFieldScroll | null>(null);
+  const fieldMoveAnimationsRef = useRef<Animation[]>([]);
   const fields = useMemo(
     () => normalizeFields(controlledFields ?? internalFields),
     [controlledFields, internalFields],
+  );
+
+  useIsomorphicLayoutEffect(() => {
+    const pendingMove = pendingFieldMoveRef.current;
+    if (!pendingMove) return;
+    pendingFieldMoveRef.current = null;
+
+    const movedField = fields[pendingMove.toOrder - 1];
+    const isExpectedField =
+      movedField !== undefined &&
+      (pendingMove.fieldId !== undefined
+        ? movedField.id === pendingMove.fieldId
+        : movedField.type === pendingMove.fieldType &&
+          movedField.label === pendingMove.fieldLabel);
+    if (!isExpectedField) return;
+
+    const movedCard = fieldCardsRef.current.get(pendingMove.toOrder);
+    const displacedCard = fieldCardsRef.current.get(pendingMove.fromOrder);
+    if (
+      !movedCard ||
+      !displacedCard ||
+      typeof movedCard.animate !== "function" ||
+      (typeof window.matchMedia === "function" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+    ) {
+      return;
+    }
+
+    const movedOffset =
+      pendingMove.fromTop - movedCard.getBoundingClientRect().top;
+    const displacedOffset =
+      pendingMove.toTop - displacedCard.getBoundingClientRect().top;
+
+    const movedAnimation = movedCard.animate(
+      [
+        {
+          transform: `translateY(${movedOffset}px)`,
+          boxShadow: "0 0 0 2px rgb(49 87 213 / 18%)",
+        },
+        {
+          transform: "translateY(0)",
+          boxShadow: "0 0 0 2px rgb(49 87 213 / 12%)",
+          offset: 0.72,
+        },
+        {
+          transform: "translateY(0)",
+          boxShadow: "0 0 0 0 rgb(49 87 213 / 0%)",
+        },
+      ],
+      {
+        duration: 360,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      },
+    );
+    const displacedAnimation = displacedCard.animate(
+      [
+        { transform: `translateY(${displacedOffset}px)` },
+        { transform: "translateY(0)" },
+      ],
+      {
+        duration: 300,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      },
+    );
+    fieldMoveAnimationsRef.current = [
+      movedAnimation,
+      displacedAnimation,
+    ];
+  }, [fields]);
+
+  useIsomorphicLayoutEffect(() => {
+    const pendingScroll = pendingFieldScrollRef.current;
+    if (!pendingScroll) return;
+
+    const addedField = fields[pendingScroll.order - 1];
+    if (!addedField || !isHighlightedField(addedField, pendingScroll)) return;
+
+    const addedCard = fieldCardsRef.current.get(pendingScroll.order);
+    if (!addedCard) return;
+
+    pendingFieldScrollRef.current = null;
+    const prefersReducedMotion =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    addedCard.scrollIntoView({
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+      block: "nearest",
+    });
+  }, [fields]);
+
+  useEffect(
+    () => () => {
+      for (const animation of fieldMoveAnimationsRef.current) {
+        animation.cancel();
+      }
+    },
+    [],
   );
 
   const commit = (nextFields: FormField[]) => {
@@ -538,24 +727,87 @@ export function FormBuilder({
     onChange?.(reindexed);
   };
 
-  const add = (type: FieldType, position = fields.length) => {
-    if (disabled) return;
+  const highlightField = (field: FormField, order = field.order) => {
+    setHighlightedField(highlightedFieldFrom(field, order));
+  };
+
+  const moveField = (field: FormField, direction: -1 | 1) => {
+    const currentIndex = field.order - 1;
+    const targetIndex = currentIndex + direction;
+    if (targetIndex < 0 || targetIndex >= fields.length) return;
+
+    for (const animation of fieldMoveAnimationsRef.current) {
+      animation.finish();
+    }
+    fieldMoveAnimationsRef.current = [];
+
+    const fromCard = fieldCardsRef.current.get(field.order);
+    const toOrder = targetIndex + 1;
+    const toCard = fieldCardsRef.current.get(toOrder);
+    if (fromCard && toCard) {
+      pendingFieldMoveRef.current = {
+        fromOrder: field.order,
+        toOrder,
+        fromTop: fromCard.getBoundingClientRect().top,
+        toTop: toCard.getBoundingClientRect().top,
+        fieldId: field.id,
+        fieldType: field.type,
+        fieldLabel: field.label,
+      };
+    }
+
     const next = [...fields];
-    next.splice(
-      position,
-      0,
-      createField(type, position + 1, { currencyPrefix, phonePrefix }),
-    );
+    const adjacentField = next[targetIndex];
+    if (!adjacentField) return;
+    next[currentIndex] = adjacentField;
+    next[targetIndex] = field;
+    highlightField(field, toOrder);
     commit(next);
   };
 
-  const dropAt = (position: number) => {
-    if (!drag || disabled) return;
-    if (drag.kind === "new") {
-      add(drag.type, position);
+  const add = (type: FieldType, position = fields.length) => {
+    if (disabled) return;
+    const addedField = createField(type, position + 1, {
+      currencyPrefix,
+      phonePrefix,
+    });
+    const next = [...fields];
+    next.splice(position, 0, addedField);
+    if (position === fields.length) {
+      pendingFieldScrollRef.current = highlightedFieldFrom(addedField);
+    }
+    commit(next);
+    highlightField(addedField, position + 1);
+    setEditingOrder(position + 1);
+  };
+
+  const editField = (field: FormField) => {
+    if (disabled) return;
+    highlightField(field);
+    setEditingOrder(field.order);
+  };
+
+  const copyField = (field: FormField) => {
+    const copiedField = duplicateField(field, field.order + 1);
+    const next = [...fields];
+    next.splice(field.order, 0, copiedField);
+    if (field.order === fields.length) {
+      pendingFieldScrollRef.current = highlightedFieldFrom(copiedField);
+    }
+    commit(next);
+    highlightField(copiedField);
+    setEditingOrder(field.order + 1);
+  };
+
+  const dropAt = (position: number, dataTransfer?: DataTransfer) => {
+    const draggedField =
+      dragRef.current ?? drag ?? (dataTransfer ? parseFieldDrag(dataTransfer) : null);
+    if (!draggedField || disabled) return;
+    if (draggedField.kind === "new") {
+      add(draggedField.type, position);
     } else {
       const sourceIndex = fields.findIndex(
-        (field) => field.order === drag.order,
+        (field) => field.order === draggedField.order,
       );
       if (sourceIndex < 0) return;
       const next = [...fields];
@@ -563,9 +815,25 @@ export function FormBuilder({
       if (!moved) return;
       const destination = sourceIndex < position ? position - 1 : position;
       next.splice(destination, 0, moved);
+      if (destination !== sourceIndex) {
+        highlightField(moved, destination + 1);
+      }
       commit(next);
     }
+    dragRef.current = null;
     setDrag(null);
+  };
+
+  const dropPositionAt = (clientY: number) => {
+    for (const field of fields) {
+      const card = fieldCardsRef.current.get(field.order);
+      if (!card) continue;
+      const bounds = card.getBoundingClientRect();
+      if (clientY < bounds.top + bounds.height / 2) {
+        return field.order - 1;
+      }
+    }
+    return fields.length;
   };
 
   const startDrag = (event: DragEvent, value: Exclude<FieldDrag, null>) => {
@@ -573,9 +841,17 @@ export function FormBuilder({
       event.preventDefault();
       return;
     }
+    dragRef.current = value;
     setDrag(value);
     event.dataTransfer.effectAllowed = value.kind === "new" ? "copy" : "move";
-    event.dataTransfer.setData("text/plain", JSON.stringify(value));
+    const serialized = JSON.stringify(value);
+    event.dataTransfer.setData(FIELD_DRAG_DATA_TYPE, serialized);
+    event.dataTransfer.setData("text/plain", serialized);
+  };
+
+  const endDrag = () => {
+    dragRef.current = null;
+    setDrag(null);
   };
 
   return (
@@ -584,15 +860,29 @@ export function FormBuilder({
       style={style}
       aria-label={ariaLabel}
     >
-      <main className="rfb-canvas">
+      <main
+        className="rfb-canvas"
+        onDragOver={(event) => {
+          if (
+            disabled ||
+            (!dragRef.current &&
+              !drag &&
+              !event.dataTransfer.types.includes(FIELD_DRAG_DATA_TYPE))
+          ) {
+            return;
+          }
+          event.preventDefault();
+          event.dataTransfer.dropEffect =
+            (dragRef.current ?? drag)?.kind === "new" ? "copy" : "move";
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          dropAt(dropPositionAt(event.clientY), event.dataTransfer);
+        }}
+      >
         {fields.length === 0 ? (
           <div
             className={`rfb-empty${drag ? " rfb-empty--active" : ""}`}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => {
-              event.preventDefault();
-              dropAt(0);
-            }}
           >
             <span className="rfb-empty__icon">
               <PlusIcon />
@@ -605,19 +895,40 @@ export function FormBuilder({
               drag !== null ? " rfb-field-list--dragging" : ""
             }`}
           >
-            <DropZone active={drag !== null} onDrop={() => dropAt(0)} />
+            <DropZone
+              active={drag !== null}
+              onDrop={(event) => dropAt(0, event.dataTransfer)}
+            />
             {fields.map((field, index) => (
               <div key={field.id ?? `${field.type}-${field.order}`}>
                 <article
-                  className="rfb-field-card"
+                  className={`rfb-field-card${
+                    isHighlightedField(field, highlightedField)
+                      ? " rfb-field-card--highlighted"
+                      : ""
+                  }`}
+                  onAnimationEnd={(event) => {
+                    if (
+                      event.animationName !== "rfb-field-highlight" ||
+                      !isHighlightedField(field, highlightedField)
+                    ) {
+                      return;
+                    }
+                    setHighlightedField(null);
+                  }}
+                  ref={(node) => {
+                    if (node) {
+                      fieldCardsRef.current.set(field.order, node);
+                    } else {
+                      fieldCardsRef.current.delete(field.order);
+                    }
+                  }}
                   draggable={!disabled && editingOrder === null}
                   onDragStart={(event) =>
                     startDrag(event, { kind: "field", order: field.order })
                   }
-                  onDragEnd={() => setDrag(null)}
-                  onDoubleClick={() =>
-                    !disabled && setEditingOrder(field.order)
-                  }
+                  onDragEnd={endDrag}
+                  onDoubleClick={() => editField(field)}
                 >
                   <span
                     className="rfb-drag-handle"
@@ -667,16 +978,7 @@ export function FormBuilder({
                     <button
                       type="button"
                       className="rfb-icon-button"
-                      onClick={() => {
-                        const currentIndex = field.order - 1;
-                        if (currentIndex <= 0) return;
-                        const next = [...fields];
-                        const previous = next[currentIndex - 1];
-                        if (!previous) return;
-                        next[currentIndex - 1] = field;
-                        next[currentIndex] = previous;
-                        commit(next);
-                      }}
+                      onClick={() => moveField(field, -1)}
                       disabled={disabled || field.order === 1}
                       aria-label={`Mover ${field.label} para cima`}
                       title="Mover para cima"
@@ -686,16 +988,7 @@ export function FormBuilder({
                     <button
                       type="button"
                       className="rfb-icon-button"
-                      onClick={() => {
-                        const currentIndex = field.order - 1;
-                        if (currentIndex >= fields.length - 1) return;
-                        const next = [...fields];
-                        const following = next[currentIndex + 1];
-                        if (!following) return;
-                        next[currentIndex] = following;
-                        next[currentIndex + 1] = field;
-                        commit(next);
-                      }}
+                      onClick={() => moveField(field, 1)}
                       disabled={disabled || field.order === fields.length}
                       aria-label={`Mover ${field.label} para baixo`}
                       title="Mover para baixo"
@@ -705,7 +998,7 @@ export function FormBuilder({
                     <button
                       type="button"
                       className="rfb-icon-button"
-                      onClick={() => setEditingOrder(field.order)}
+                      onClick={() => editField(field)}
                       disabled={disabled}
                       aria-label={`Editar ${field.label}`}
                       title="Editar"
@@ -715,12 +1008,7 @@ export function FormBuilder({
                     <button
                       type="button"
                       className="rfb-icon-button"
-                      onClick={() =>
-                        commit([
-                          ...fields,
-                          duplicateField(field, fields.length + 1),
-                        ])
-                      }
+                      onClick={() => copyField(field)}
                       disabled={disabled}
                       aria-label={`Duplicar ${field.label}`}
                       title="Duplicar"
@@ -752,6 +1040,7 @@ export function FormBuilder({
                     disabled={disabled}
                     onCancel={() => setEditingOrder(null)}
                     onSave={(updated) => {
+                      highlightField(updated, field.order);
                       commit(
                         fields.map((item) =>
                           item.order === field.order
@@ -765,7 +1054,9 @@ export function FormBuilder({
                 )}
                 <DropZone
                   active={drag !== null}
-                  onDrop={() => dropAt(index + 1)}
+                  onDrop={(event) =>
+                    dropAt(index + 1, event.dataTransfer)
+                  }
                 />
               </div>
             ))}
@@ -790,7 +1081,7 @@ export function FormBuilder({
                 onDragStart={(event) =>
                   startDrag(event, { kind: "new", type })
                 }
-                onDragEnd={() => setDrag(null)}
+                onDragEnd={endDrag}
                 onClick={() => add(type)}
                 key={type}
               >
